@@ -1,45 +1,58 @@
 "use strict";
 
-const API = "/api";
+/*
+ * KN4GHT HOSTING DASHBOARD
+ *
+ * IMPORTANT:
+ * GitHub Pages only hosts the frontend.
+ * Your Node.js backend must run somewhere else.
+ *
+ * After you deploy server.js, change BACKEND_URL below.
+ *
+ * Example:
+ * const BACKEND_URL = "https://api.kn4ght.example";
+ *
+ * Do NOT put your panel key directly in this file.
+ */
+
+const BACKEND_URL = "";
 
 let panelKey =
-  sessionStorage.getItem(
-    "kn4ght_panel_key"
-  );
+  sessionStorage.getItem("kn4ght_panel_key") || "";
 
 let selectedProjectId = null;
+
+const $ = (id) =>
+  document.getElementById(id);
 
 document.addEventListener(
   "DOMContentLoaded",
   () => {
 
-    document
-      .getElementById("createBtn")
-      .addEventListener(
-        "click",
-        createProject
-      );
+    $("createBtn")?.addEventListener(
+      "click",
+      createProject
+    );
 
-    document
-      .getElementById("refreshBtn")
-      .addEventListener(
-        "click",
-        loadProjects
-      );
+    $("refreshBtn")?.addEventListener(
+      "click",
+      loadProjects
+    );
 
-    document
-      .getElementById("closeModal")
-      .addEventListener(
-        "click",
-        closeModal
-      );
+    $("closeModal")?.addEventListener(
+      "click",
+      closeModal
+    );
 
-    document
-      .getElementById("uploadBtn")
-      .addEventListener(
-        "click",
-        uploadProject
-      );
+    $("uploadBtn")?.addEventListener(
+      "click",
+      uploadProject
+    );
+
+    if (!BACKEND_URL) {
+      showBackendMessage();
+      return;
+    }
 
     if (!panelKey) {
       askForKey();
@@ -49,6 +62,28 @@ document.addEventListener(
   }
 );
 
+function showBackendMessage() {
+
+  const container =
+    $("projects");
+
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="empty">
+      <strong>Backend not connected</strong>
+      <br><br>
+      Your GitHub Pages dashboard is working,
+      but the Kn4ght Hosting backend is not
+      configured yet.
+      <br><br>
+      Deploy <code>server.js</code> to your VPS,
+      then set <code>BACKEND_URL</code> in
+      <code>script.js</code>.
+    </div>
+  `;
+}
+
 function askForKey() {
 
   const key = prompt(
@@ -56,6 +91,7 @@ function askForKey() {
   );
 
   if (!key) {
+    showBackendMessage();
     return;
   }
 
@@ -69,34 +105,95 @@ function askForKey() {
   loadProjects();
 }
 
+function backendUrl(path) {
+
+  return (
+    BACKEND_URL.replace(/\/+$/, "") +
+    "/api" +
+    path
+  );
+}
+
 async function api(
-  endpoint,
+  path,
   options = {}
 ) {
 
-  const headers =
-    options.headers || {};
+  if (!BACKEND_URL) {
+    throw new Error(
+      "Backend URL has not been configured."
+    );
+  }
 
-  headers["x-panel-key"] =
-    panelKey;
+  const headers = {
+    ...(options.headers || {})
+  };
+
+  headers[
+    "x-panel-key"
+  ] = panelKey;
 
   options.headers = headers;
 
-  const response =
-    await fetch(
-      API + endpoint,
+  let response;
+
+  try {
+
+    response = await fetch(
+      backendUrl(path),
       options
     );
 
+  } catch (error) {
+
+    throw new Error(
+      "Cannot connect to the Kn4ght Hosting backend."
+    );
+  }
+
+  const contentType =
+    response.headers.get(
+      "content-type"
+    ) || "";
+
+  /*
+   * This prevents the:
+   *
+   * Unexpected token '<'
+   *
+   * error when a server sends HTML
+   * instead of JSON.
+   */
+
   if (
-    response.status === 401
+    !contentType.includes(
+      "application/json"
+    )
   ) {
+
+    const text =
+      await response.text();
+
+    console.error(
+      "Backend returned non-JSON:",
+      text.slice(0, 500)
+    );
+
+    throw new Error(
+      "The backend returned HTML instead of JSON. Check your backend URL."
+    );
+  }
+
+  const data =
+    await response.json();
+
+  if (response.status === 401) {
 
     sessionStorage.removeItem(
       "kn4ght_panel_key"
     );
 
-    panelKey = null;
+    panelKey = "";
 
     alert(
       "Invalid panel key."
@@ -109,10 +206,8 @@ async function api(
     );
   }
 
-  const data =
-    await response.json();
-
   if (!response.ok) {
+
     throw new Error(
       data.error ||
       "Request failed."
@@ -125,21 +220,20 @@ async function api(
 async function loadProjects() {
 
   const container =
-    document.getElementById(
-      "projects"
-    );
+    $("projects");
 
-  container.innerHTML =
-    `<div class="empty">
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="empty">
       Loading projects...
-    </div>`;
+    </div>
+  `;
 
   try {
 
     const projects =
-      await api(
-        "/projects"
-      );
+      await api("/projects");
 
     renderProjects(
       projects
@@ -147,12 +241,15 @@ async function loadProjects() {
 
   } catch (error) {
 
-    container.innerHTML =
-      `<div class="empty">
+    container.innerHTML = `
+      <div class="empty">
+        <strong>Unable to load projects</strong>
+        <br><br>
         ${escapeHTML(
           error.message
         )}
-      </div>`;
+      </div>
+    `;
   }
 }
 
@@ -161,17 +258,17 @@ function renderProjects(
 ) {
 
   const container =
-    document.getElementById(
-      "projects"
-    );
+    $("projects");
 
   if (!projects.length) {
 
-    container.innerHTML =
-      `<div class="empty">
+    container.innerHTML = `
+      <div class="empty">
         No projects yet.
+        <br><br>
         Create your first project above.
-      </div>`;
+      </div>
+    `;
 
     return;
   }
@@ -184,15 +281,26 @@ function renderProjects(
           project.status ===
           "running";
 
+        const id =
+          escapeAttribute(
+            project.id
+          );
+
+        const name =
+          escapeHTML(
+            project.name
+          );
+
         return `
-          <article class="project">
+          <article
+            class="project">
 
-            <div class="project-header">
+            <div
+              class="project-header">
 
-              <div class="project-name">
-                ${escapeHTML(
-                  project.name
-                )}
+              <div
+                class="project-name">
+                ${name}
               </div>
 
               <span
@@ -219,14 +327,14 @@ function renderProjects(
                   ? `
                     <button
                       class="danger"
-                      onclick="stopProject('${project.id}')">
+                      onclick="stopProject('${id}')">
                       Stop
                     </button>
                   `
                   : `
                     <button
                       class="primary"
-                      onclick="startProject('${project.id}')">
+                      onclick="startProject('${id}')">
                       Start
                     </button>
                   `
@@ -234,32 +342,37 @@ function renderProjects(
 
               <button
                 class="secondary"
-                onclick="restartProject('${project.id}')">
+                onclick="restartProject('${id}')">
                 Restart
               </button>
 
               <button
                 class="secondary"
-                onclick="openUpload('${project.id}', '${escapeAttribute(project.name)}')">
+                onclick="openUpload(
+                  '${id}',
+                  '${escapeAttribute(
+                    project.name
+                  )}'
+                )">
                 Upload
               </button>
 
               <button
                 class="secondary"
-                onclick="showLogs('${project.id}')">
+                onclick="showLogs('${id}')">
                 Logs
               </button>
 
               <button
                 class="danger"
-                onclick="deleteProject('${project.id}')">
+                onclick="deleteProject('${id}')">
                 Delete
               </button>
 
             </div>
 
             <pre
-              id="logs-${project.id}"
+              id="logs-${id}"
               class="logs"
               style="display:none;"></pre>
 
@@ -272,17 +385,19 @@ function renderProjects(
 async function createProject() {
 
   const input =
-    document.getElementById(
-      "projectName"
-    );
+    $("projectName");
+
+  if (!input) return;
 
   const name =
     input.value.trim();
 
   if (!name) {
+
     alert(
       "Enter a project name."
     );
+
     return;
   }
 
@@ -317,7 +432,9 @@ async function createProject() {
   }
 }
 
-async function startProject(id) {
+async function startProject(
+  id
+) {
 
   try {
 
@@ -338,7 +455,9 @@ async function startProject(id) {
   }
 }
 
-async function stopProject(id) {
+async function stopProject(
+  id
+) {
 
   try {
 
@@ -359,7 +478,9 @@ async function stopProject(id) {
   }
 }
 
-async function restartProject(id) {
+async function restartProject(
+  id
+) {
 
   try {
 
@@ -388,43 +509,38 @@ function openUpload(
   selectedProjectId =
     id;
 
-  document
-    .getElementById(
-      "uploadProjectName"
-    )
-    .textContent =
-    `Project: ${name}`;
+  const projectName =
+    $("uploadProjectName");
 
-  document
-    .getElementById(
-      "zipFile"
-    )
-    .value = "";
+  const file =
+    $("zipFile");
 
-  document
-    .getElementById(
-      "uploadStatus"
-    )
-    .textContent = "";
+  const status =
+    $("uploadStatus");
 
-  document
-    .getElementById(
-      "modal"
-    )
-    .classList.remove(
-      "hidden"
-    );
+  if (projectName) {
+    projectName.textContent =
+      `Project: ${name}`;
+  }
+
+  if (file) {
+    file.value = "";
+  }
+
+  if (status) {
+    status.textContent = "";
+  }
+
+  $("modal")?.classList.remove(
+    "hidden"
+  );
 }
 
 function closeModal() {
 
-  document
-    .getElementById(
-      "modal"
-    )
-    .classList.add(
-      "hidden"
-    );
+  $("modal")?.classList.add(
+    "hidden"
+  );
 
   selectedProjectId =
     null;
@@ -432,29 +548,47 @@ function closeModal() {
 
 async function uploadProject() {
 
-  const file =
-    document
-      .getElementById(
-        "zipFile"
-      )
-      .files[0];
+  if (!selectedProjectId) {
+    return;
+  }
+
+  const fileInput =
+    $("zipFile");
 
   const status =
-    document
-      .getElementById(
-        "uploadStatus"
-      );
+    $("uploadStatus");
+
+  const file =
+    fileInput?.files?.[0];
 
   if (!file) {
 
-    status.textContent =
-      "Choose a ZIP file.";
+    if (status) {
+      status.textContent =
+        "Choose a ZIP file.";
+    }
 
     return;
   }
 
-  status.textContent =
-    "Uploading...";
+  if (
+    !file.name
+      .toLowerCase()
+      .endsWith(".zip")
+  ) {
+
+    if (status) {
+      status.textContent =
+        "Only ZIP files are allowed.";
+    }
+
+    return;
+  }
+
+  if (status) {
+    status.textContent =
+      "Uploading...";
+  }
 
   const form =
     new FormData();
@@ -474,8 +608,10 @@ async function uploadProject() {
       }
     );
 
-    status.textContent =
-      "Upload complete.";
+    if (status) {
+      status.textContent =
+        "Upload complete.";
+    }
 
     setTimeout(
       () => {
@@ -487,17 +623,23 @@ async function uploadProject() {
 
   } catch (error) {
 
-    status.textContent =
-      error.message;
+    if (status) {
+      status.textContent =
+        error.message;
+    }
   }
 }
 
-async function showLogs(id) {
+async function showLogs(
+  id
+) {
 
   const element =
     document.getElementById(
       `logs-${id}`
     );
+
+  if (!element) return;
 
   if (
     element.style.display ===
@@ -534,13 +676,16 @@ async function showLogs(id) {
   }
 }
 
-async function deleteProject(id) {
+async function deleteProject(
+  id
+) {
 
-  if (
-    !confirm(
-      "Delete this project and its files?"
-    )
-  ) {
+  const confirmed =
+    confirm(
+      "Delete this project and all of its files?"
+    );
+
+  if (!confirmed) {
     return;
   }
 
@@ -563,21 +708,48 @@ async function deleteProject(id) {
   }
 }
 
-function escapeHTML(value) {
+function escapeHTML(
+  value
+) {
 
   return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+    .replaceAll(
+      "&",
+      "&amp;"
+    )
+    .replaceAll(
+      "<",
+      "&lt;"
+    )
+    .replaceAll(
+      ">",
+      "&gt;"
+    )
+    .replaceAll(
+      '"',
+      "&quot;"
+    )
+    .replaceAll(
+      "'",
+      "&#039;"
+    );
 }
 
-function escapeAttribute(value) {
+function escapeAttribute(
+  value
+) {
 
-  return escapeHTML(value)
+  return String(value)
+    .replaceAll(
+      "\\",
+      "\\\\"
+    )
     .replaceAll(
       "'",
       "\\'"
+    )
+    .replaceAll(
+      '"',
+      "&quot;"
     );
 }
