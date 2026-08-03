@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0">
+
+  <meta
+    name="theme-color"
+    content="#5865f2">
+
+  <title>
+    Kn4ght Hosting
+  </title>
+
+  <link
+    rel="stylesheet"
+    href="style.css">
+
+</head>
+
+<body>
+
+  <header class="topbar">
+
+    <div class="brand">
+      🛡️ Kn4ght Hosting
+    </div>
+
+    <button
+      id="refreshBtn"
+      class="secondary">
+      Refresh
+    </button>
+
+  </header>
+
+  <main>
+
+    <section class="hero">
+
+      <span class="badge">
+        SELF-HOSTED
+      </span>
+
+      <h1>
+        Kn4ght Hosting
+      </h1>
+
+      <p>
+        Manage your Node.js projects and
+        Discord bots from one dashboard.
+      </p>
+
+    </section>
+
+    <section class="toolbar">
+
+      <input
+        id="projectName"
+        type="text"
+        maxlength="32"
+        placeholder="Project name">
+
+      <button
+        id="createBtn"
+        class="primary">
+
+        + Create Project
+
+      </button>
+
+    </section>
+
+    <section
+      id="projects"
+      class="projects">
+
+      <div class="empty">
+        Loading projects...
+      </div>
+
+    </section>
+
+  </main>
+
+  <div
+    id="modal"
+    class="modal hidden">
+
+    <div class="modal-box">
+
+      <button
+        id="closeModal"
+        class="close">
+        ×
+      </button>
+
+      <h2>
+        Upload Project
+      </h2>
+
+      <p id="uploadProjectName"></p>
+
+      <input
+        id="zipFile"
+        type="file"
+        accept=".zip">
+
+      <button
+        id="uploadBtn"
+        class="primary">
+
+        Upload ZIP
+
+      </button>
+
+      <p
+        id="uploadStatus"
+        class="message">
+      </p>
+
+    </div>
+
+  </div>
+
+  <script src="script.js"></script>
+
+</body>
+
+</html>

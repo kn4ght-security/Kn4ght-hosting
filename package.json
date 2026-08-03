@@ -1,0 +1,17 @@
+{
+  "name": "kn4ght-hosting",
+  "version": "1.0.0",
+  "description": "Self-hosted Kn4ght Hosting panel for Node.js projects",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "dotenv": "^17.2.1",
+    "dockerode": "^4.0.7",
+    "express": "^5.1.0",
+    "multer": "^2.0.2"
+  }
+}
